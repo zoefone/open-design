@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import { mergeProxyAwareEnv, resolveSystemProxyEnv } from '@open-design/platform';
 import { expandConfiguredEnv } from './paths.js';
 import { resolveAmrOpenCodeExecutable } from './executables.js';
 import { amrVelaProfileEnv } from '../integrations/vela-profile.js';
@@ -36,11 +37,14 @@ export function spawnEnvForAgent(
   agentId: string,
   baseEnv: RuntimeEnvMap,
   configuredEnv: unknown = {},
+  systemProxyEnv: RuntimeEnvMap = resolveSystemProxyEnv(),
 ): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...baseEnv,
-    ...expandConfiguredEnv(configuredEnv),
-  };
+  const env = mergeProxyAwareEnv(
+    process.platform,
+    systemProxyEnv,
+    baseEnv,
+    expandConfiguredEnv(configuredEnv),
+  );
   if (agentId === 'amr') {
     Object.assign(env, amrVelaProfileEnv(env));
     if (!env.OPENCODE_TEST_HOME?.trim() && env.OD_DATA_DIR?.trim()) {

@@ -1,6 +1,7 @@
 import { symlinkSync } from 'node:fs';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import { homedir } from 'node:os';
+import * as platform from '@open-design/platform';
 import {
   assert, chmodSync, detectAgents, inspectAgentExecutableResolution, join, minimalAgentDef, mkdirSync, mkdtempSync, opencode, resolveAgentExecutable, rmSync, spawnEnvForAgent, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
 } from './helpers/test-helpers.js';
@@ -52,6 +53,86 @@ test('spawnEnvForAgent applies configured Codex env without mutating the base en
   assert.equal(env.PATH, '/usr/bin');
   assert.equal('CODEX_HOME' in base, false);
   assert.equal('CODEX_BIN' in base, false);
+});
+
+test('spawnEnvForAgent applies system proxy env to all agent runtimes before base env overrides', () => {
+  const env = spawnEnvForAgent(
+    'gemini',
+    {
+      HTTPS_PROXY: 'http://user-env:9000',
+      PATH: '/usr/bin',
+    },
+    {},
+    {
+      HTTP_PROXY: 'http://system-http:7890',
+      HTTPS_PROXY: 'http://system-https:7891',
+      ALL_PROXY: 'socks5://system-socks:1080',
+      NO_PROXY: '.local,localhost',
+      NODE_USE_ENV_PROXY: '1',
+    },
+  );
+
+  assert.equal(env.HTTP_PROXY, 'http://system-http:7890');
+  assert.equal(env.HTTPS_PROXY, 'http://user-env:9000');
+  assert.equal(env.ALL_PROXY, 'socks5://system-socks:1080');
+  assert.equal(env.NO_PROXY, '.local,localhost');
+  assert.equal(env.NODE_USE_ENV_PROXY, '1');
+  assert.equal(env.PATH, '/usr/bin');
+});
+
+test('spawnEnvForAgent resolves system proxy env for each default agent launch', () => {
+  const proxySpy = vi.spyOn(platform, 'resolveSystemProxyEnv').mockReturnValue({
+    HTTPS_PROXY: 'http://system-https:7891',
+    NODE_USE_ENV_PROXY: '1',
+  });
+
+  try {
+    const env = spawnEnvForAgent('gemini', { PATH: '/usr/bin' });
+
+    assert.deepEqual(proxySpy.mock.calls, [[]]);
+    assert.equal(env.HTTPS_PROXY, 'http://system-https:7891');
+    assert.equal(env.PATH, '/usr/bin');
+  } finally {
+    proxySpy.mockRestore();
+  }
+});
+
+test('spawnEnvForAgent lets explicit lowercase proxy env override system uppercase proxy env', () => {
+  const env = spawnEnvForAgent(
+    'gemini',
+    {
+      https_proxy: 'http://user-lowercase:9000',
+      PATH: '/usr/bin',
+    },
+    {},
+    {
+      HTTPS_PROXY: 'http://system-uppercase:7891',
+      NODE_USE_ENV_PROXY: '1',
+    },
+  );
+
+  assert.equal(env.HTTPS_PROXY, 'http://user-lowercase:9000');
+  if (process.platform !== 'win32') {
+    assert.equal(env.https_proxy, 'http://user-lowercase:9000');
+  }
+});
+
+test('spawnEnvForAgent enables Node env proxy support for inherited lowercase proxy env', () => {
+  const env = spawnEnvForAgent(
+    'gemini',
+    {
+      http_proxy: 'http://user-lowercase:9000',
+      PATH: '/usr/bin',
+    },
+    {},
+    {},
+  );
+
+  assert.equal(env.HTTP_PROXY, 'http://user-lowercase:9000');
+  assert.equal(env.NODE_USE_ENV_PROXY, '1');
+  if (process.platform !== 'win32') {
+    assert.equal(env.http_proxy, 'http://user-lowercase:9000');
+  }
 });
 
 test('spawnEnvForAgent expands configured env home paths', () => {
