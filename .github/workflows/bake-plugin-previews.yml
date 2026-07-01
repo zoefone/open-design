@@ -36,6 +36,10 @@ concurrency:
 jobs:
   bake:
     name: Bake plugin previews
+    # Trusted uploader/PR-writer workflow for upstream only. Forks do not have
+    # the R2 credentials or release-bot App secrets this job needs, so scheduled
+    # runs there fail every night and send unnecessary notifications.
+    if: github.repository == 'nexu-io/open-design'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:

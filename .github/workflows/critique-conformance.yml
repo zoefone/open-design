@@ -25,6 +25,10 @@ on:
 jobs:
   run:
     name: nightly conformance + ratchet snapshot
+    # This cron belongs to the upstream production repository. In forks it only
+    # generates noisy scheduled-run failures/notifications, and the production
+    # rollout ratchet it feeds is not consumed there.
+    if: github.repository == 'nexu-io/open-design'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -60,7 +64,7 @@ jobs:
       # instead of uploading an empty history snapshot.
       - name: Run conformance harness (synthetic adapters)
         run: |
-          node --import tsx apps/daemon/src/critique/__fixtures__/run-nightly.ts
+          node --import tsx apps/daemon/src/critique/__fixtures__/run-prerelease.ts
 
       - name: Upload history snapshot
         if: always()

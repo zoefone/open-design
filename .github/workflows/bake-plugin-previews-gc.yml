@@ -35,6 +35,9 @@ concurrency:
 jobs:
   gc:
     name: GC orphaned preview clips
+    # Upstream-only: forks do not own the R2 bucket credentials, and even dry-run
+    # GC needs the bucket endpoint to enumerate objects.
+    if: github.repository == 'nexu-io/open-design'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
