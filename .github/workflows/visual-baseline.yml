@@ -16,6 +16,9 @@ concurrency:
 jobs:
   baseline:
     name: Capture visual baselines
+    # Uses upstream-only Blacksmith runners and R2 credentials. Fork pushes
+    # should not enqueue this baseline capture.
+    if: github.repository == 'nexu-io/open-design'
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 30
 
